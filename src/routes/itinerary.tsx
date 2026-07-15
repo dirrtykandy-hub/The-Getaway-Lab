@@ -1,29 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  getSurveyResponse,
+  getItineraryBySurveyId,
+  saveItinerary,
+  type SurveyData,
+  type ItineraryData,
+} from "~/lib/db-queries";
 
 export const Route = createFileRoute("/itinerary")({
   component: ItineraryPage,
 });
 
 const STORAGE_KEY = "getaway-survey";
-
-interface SurveyData {
-  destination: string;
-  tripType: string;
-  duration: string;
-  adults: string;
-  kids: string;
-  budget: string;
-  accommodation: string;
-  starRating: string;
-  travelMethod: string;
-  reason: string;
-  activities: string[];
-  vibe: string;
-  weatherPref: string;
-  avoid: string;
-  dates: string;
-}
 
 interface DayPlan {
   day: number;
@@ -312,23 +301,63 @@ function ItineraryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate generation delay for UX
-    const timer = setTimeout(() => {
+    const loadData = async () => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const surveyData = JSON.parse(saved) as SurveyData;
-          setData(surveyData);
-          const result = generateItinerary(surveyData);
-          setItinerary(result);
+        // Try loading from database first
+        const surveyId = localStorage.getItem("getaway-survey-id");
+        if (surveyId) {
+          const dbItinerary = await getItineraryBySurveyId(surveyId);
+          if (dbItinerary) {
+            const dbSurvey = await getSurveyResponse(surveyId);
+            if (dbSurvey) {
+              setData(dbSurvey as SurveyData);
+              setItinerary(dbItinerary as unknown as Itinerary);
+              setLoading(false);
+              return;
+            }
+          }
         }
       } catch {
-        // If no data, redirect to survey
+        // DB not available - fall through to localStorage
       }
-      setLoading(false);
-    }, 1200);
 
-    return () => clearTimeout(timer);
+      // Fallback to localStorage
+      setTimeout(() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const surveyData = JSON.parse(saved) as SurveyData;
+            setData(surveyData);
+            const result = generateItinerary(surveyData);
+
+            // Try saving generated itinerary to DB in background
+            const surveyId = localStorage.getItem("getaway-survey-id");
+            if (surveyId && surveyData) {
+              saveItinerary({
+                surveyId,
+                title: result.title,
+                subtitle: result.subtitle,
+                destinationLabel: result.destinationLabel,
+                estimatedCostLabel: result.estimatedCost.label,
+                estimatedCostAmount: result.estimatedCost.amount,
+                summary: result.summary,
+                hotels: result.hotels,
+                days: result.days,
+                tips: result.tips,
+                rawSurvey: surveyData as unknown as Record<string, unknown>,
+              }).catch(() => {});
+            }
+
+            setItinerary(result);
+          }
+        } catch {
+          // If no data, redirect to survey
+        }
+        setLoading(false);
+      }, 1200);
+    };
+
+    loadData();
   }, []);
 
   if (loading) {

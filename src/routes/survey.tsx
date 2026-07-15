@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
+import { saveSurveyResponse } from "~/lib/db-queries";
 
 export const Route = createFileRoute("/survey")({
   component: SurveyPage,
@@ -152,9 +153,19 @@ function SurveyPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const generateItinerary = useCallback(() => {
+  const generateItinerary = useCallback(async () => {
+    // Save to database if available, otherwise fall back to localStorage
+    try {
+      const surveyId = localStorage.getItem("getaway-survey-id");
+      if (!surveyId) {
+        const result = await saveSurveyResponse(data);
+        localStorage.setItem("getaway-survey-id", result.id);
+      }
+    } catch {
+      // DB not available - continue with localStorage
+    }
     navigate({ to: "/itinerary" });
-  }, [navigate]);
+  }, [data, navigate]);
 
   const canProceed = (): boolean => {
     switch (step) {
