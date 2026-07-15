@@ -299,6 +299,7 @@ function ItineraryPage() {
   const [data, setData] = useState<SurveyData | null>(null);
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedDay, setExpandedDay] = useState<number | null>(1);
 
   useEffect(() => {
     const loadData = async () => {
@@ -391,8 +392,6 @@ function ItineraryPage() {
       </div>
     );
   }
-
-  const [expandedDay, setExpandedDay] = useState<number | null>(1);
 
   return (
     <div className="min-h-dvh py-8">
