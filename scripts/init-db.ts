@@ -56,6 +56,12 @@ async function main() {
   `;
   console.log("itineraries table ready");
 
+  // Migration: add email and status columns
+  await sql`alter table survey_responses add column if not exists email text not null default ''`;
+  console.log("email column added");
+  await sql`alter table survey_responses add column if not exists status text not null default 'pending'`;
+  console.log("status column added");
+
   console.log("Database initialization complete!");
 }
 

@@ -9,6 +9,8 @@ export const initDatabase = createServerFn({ method: "POST" }).handler(async () 
     create table if not exists survey_responses (
       id uuid primary key default gen_random_uuid(),
       created_at timestamptz not null default now(),
+      email text not null default '',
+      status text not null default 'pending',
       destination text default '',
       trip_type text not null default 'mixed',
       duration text not null default '3',
@@ -26,6 +28,9 @@ export const initDatabase = createServerFn({ method: "POST" }).handler(async () 
       dates text default ''
     );
   `;
+  // Migration: add email and status columns if they don't exist (for existing tables)
+  try { await db`alter table survey_responses add column if not exists email text not null default ''`; } catch {}
+  try { await db`alter table survey_responses add column if not exists status text not null default 'pending'`; } catch {}
   await db`
     create table if not exists itineraries (
       id uuid primary key default gen_random_uuid(),
@@ -49,6 +54,7 @@ export const initDatabase = createServerFn({ method: "POST" }).handler(async () 
 // ─── Survey responses ───
 
 export type SurveyData = {
+  email: string;
   destination: string;
   tripType: string;
   duration: string;
@@ -70,11 +76,11 @@ export const saveSurveyResponse = createServerFn({ method: "POST" }).handler(asy
   const db = sql();
   const [row] = await db`
     insert into survey_responses (
-      destination, trip_type, duration, adults, kids, budget,
+      email, destination, trip_type, duration, adults, kids, budget,
       accommodation, star_rating, travel_method, reason,
       activities, vibe, weather_pref, avoid, dates
     ) values (
-      ${data.destination}, ${data.tripType}, ${data.duration},
+      ${data.email}, ${data.destination}, ${data.tripType}, ${data.duration},
       ${data.adults}, ${data.kids}, ${data.budget},
       ${data.accommodation}, ${data.starRating}, ${data.travelMethod},
       ${data.reason},
@@ -95,8 +101,50 @@ export const getSurveyResponse = createServerFn({ method: "GET" }).handler(async
     ...row,
     id: String(row.id),
     created_at: String(row.created_at),
+    status: row.status || "pending",
+    email: row.email || "",
     activities: parse(row.activities),
   };
+});
+
+// ─── Admin: get all surveys ───
+
+export type SurveySummary = {
+  id: string;
+  created_at: string;
+  email: string;
+  status: string;
+  destination: string;
+  trip_type: string;
+  duration: string;
+  budget: string;
+  dates: string;
+};
+
+export const getAllSurveys = createServerFn({ method: "GET" }).handler(async () => {
+  const db = sql();
+  const rows = await db`
+    select id, created_at, email, status, destination, trip_type, duration, budget, dates
+    from survey_responses
+    order by created_at desc
+  `;
+  return rows.map((r) => ({
+    id: String(r.id),
+    created_at: String(r.created_at),
+    email: r.email || "",
+    status: r.status || "pending",
+    destination: r.destination || "",
+    trip_type: r.trip_type || "",
+    duration: r.duration || "",
+    budget: r.budget || "",
+    dates: r.dates || "",
+  })) as SurveySummary[];
+});
+
+export const updateSurveyStatus = createServerFn({ method: "POST" }).handler(async (args: { id: string; status: string }) => {
+  const db = sql();
+  await db`update survey_responses set status = ${args.status} where id = ${args.id}`;
+  return { ok: true };
 });
 
 // ─── Itineraries ───

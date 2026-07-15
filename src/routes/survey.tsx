@@ -10,6 +10,7 @@ type TripType = "forest" | "beach" | "city" | "mixed";
 type AccomType = "hotel" | "airbnb" | "either";
 
 interface SurveyData {
+  email: string;
   destination: string;
   tripType: TripType;
   duration: string;
@@ -28,6 +29,7 @@ interface SurveyData {
 }
 
 const defaultSurvey: SurveyData = {
+  email: "",
   destination: "",
   tripType: "mixed",
   duration: "3",
@@ -154,23 +156,19 @@ function SurveyPage() {
   }, []);
 
   const generateItinerary = useCallback(async () => {
-    // Save to database if available, otherwise fall back to localStorage
+    // Save to database
     try {
-      const surveyId = localStorage.getItem("getaway-survey-id");
-      if (!surveyId) {
-        const result = await saveSurveyResponse(data);
-        localStorage.setItem("getaway-survey-id", result.id);
-      }
+      const result = await saveSurveyResponse(data);
+      localStorage.setItem("getaway-survey-id", result.id);
     } catch {
-      // DB not available - continue with localStorage
+      // DB not available
     }
-    navigate({ to: "/itinerary" });
-  }, [data, navigate]);
+  }, [data]);
 
   const canProceed = (): boolean => {
     switch (step) {
       case 0:
-        return data.duration !== "" && data.adults !== "";
+        return data.email !== "" && data.duration !== "" && data.adults !== "";
       case 1:
         return data.budget !== "";
       case 2:
@@ -313,6 +311,22 @@ function StepBasics({
         <span className="text-4xl">📋</span>
         <h2 className="mt-3 text-2xl font-bold text-brand-navy">Trip Basics</h2>
         <p className="mt-1 text-gray-500">Let's start with the essentials</p>
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Your email address *
+        </label>
+        <input
+          type="email"
+          value={data.email}
+          onChange={(e) => updateData({ email: e.target.value })}
+          placeholder="e.g. sarah@example.com"
+          className="input-field"
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          We'll email your personalized itinerary here.
+        </p>
       </div>
 
       <div>
@@ -700,17 +714,52 @@ function StepReview({
   data: SurveyData;
   generateItinerary: () => void;
 }) {
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    await generateItinerary();
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div className="space-y-6 text-center">
+        <span className="text-5xl">✉️</span>
+        <h2 className="text-2xl font-bold text-brand-navy">You're All Set!</h2>
+        <p className="mx-auto max-w-md text-gray-500 leading-relaxed">
+          We've received your preferences. Our travel concierge will review
+          everything and send your personalized itinerary to{" "}
+          <span className="font-semibold text-brand-teal">{data.email}</span>{" "}
+          within 24 hours.
+        </p>
+        <div className="rounded-xl bg-gradient-to-br from-brand-sky/30 to-brand-cream/30 p-6">
+          <p className="text-sm text-gray-600">
+            In the meantime, feel free to browse our{" "}
+            <a href="/" className="text-brand-teal underline underline-offset-2">
+              destination guides
+            </a>{" "}
+            for inspiration.
+          </p>
+        </div>
+        <a href="/" className="btn-primary inline-flex">
+          Back to Home
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="text-center">
         <span className="text-4xl">✅</span>
-        <h2 className="mt-3 text-2xl font-bold text-brand-navy">Review & Generate</h2>
+        <h2 className="mt-3 text-2xl font-bold text-brand-navy">Review & Submit</h2>
         <p className="mt-1 text-gray-500">
-          Here's a summary of your preferences. Ready to see your itinerary?
+          Here's a summary of your preferences. Ready to submit for review?
         </p>
       </div>
 
       <div className="space-y-3 rounded-xl bg-gradient-to-br from-brand-sky/30 to-brand-cream/30 p-6">
+        <ReviewRow label="Email" value={data.email} />
         <ReviewRow label="Duration" value={`${data.duration} nights`} />
         <ReviewRow
           label="Travelers"
@@ -763,12 +812,15 @@ function StepReview({
       </div>
 
       <div className="text-center">
-        <button onClick={generateItinerary} className="btn-primary text-lg">
-          ✨ Generate My Itinerary
+        <button onClick={handleSubmit} className="btn-primary text-lg">
+          ✉️ Submit for Review
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
           </svg>
         </button>
+        <p className="mt-2 text-xs text-gray-400">
+          A travel concierge will review your preferences and email you a custom itinerary.
+        </p>
       </div>
     </div>
   );
